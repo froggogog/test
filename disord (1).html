@@ -1,0 +1,251 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <title>Discord Clone (HTML Only)</title>
+
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #36393f;
+      color: white;
+      display: flex;
+      height: 100vh;
+    }
+
+
+    .sidebar {
+      width: 200px;
+      background: #2f3136;
+      padding: 15px;
+    }
+
+
+    .channel {
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin-bottom: 5px;
+    }
+
+
+    .channel:hover {
+      background: #40444b;
+    }
+
+
+    .chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+
+    .header {
+      padding: 15px;
+      background: #2f3136;
+      font-weight: bold;
+    }
+
+
+    .messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+
+    .message {
+      margin-bottom: 10px;
+    }
+
+
+    .username {
+      color: #5865f2;
+      font-weight: bold;
+    }
+
+
+    .input-area {
+      display: flex;
+      padding: 10px;
+      background: #40444b;
+    }
+
+
+    input {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+
+
+    button {
+      padding: 10px;
+      border: none;
+      background: #5865f2;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+
+<div class="sidebar">
+  <h3>CHANNELS</h3>
+  <div class="channel" onclick="switchChannel('general')"># general</div>
+  <div class="channel" onclick="switchChannel('gaming')"># gaming</div>
+  <div class="channel" onclick="switchChannel('coding')"># coding</div>
+</div>
+
+
+<div class="chat">
+  <div class="header" id="channelName"># general</div>
+  <div class="messages" id="messages"></div>
+
+
+  <div class="input-area">
+    <input id="messageInput" placeholder="Type message..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+
+<script type="module">
+
+
+// 🔥 REPLACE WITH YOUR FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
+};
+
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getDatabase, 
+  ref, 
+  push, 
+  onChildAdded,
+  get,
+  query,
+  limitToLast
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+
+let username = "";
+let currentChannel = "general";
+let messageRef = null;
+let loadedMessageKeys = new Set();
+
+
+while (!username) {
+  username = prompt("Enter your username:");
+}
+
+
+function sendMessage() {
+  const input = document.getElementById("messageInput");
+  if (!input.value.trim()) return;
+
+
+  push(ref(db, "channels/" + currentChannel), {
+    username,
+    text: input.value,
+    time: Date.now()
+  });
+
+
+  input.value = "";
+}
+
+
+window.sendMessage = sendMessage;
+
+
+function switchChannel(channel) {
+  if (channel === currentChannel) return;
+
+
+  currentChannel = channel;
+  document.getElementById("channelName").innerText = "# " + channel;
+  document.getElementById("messages").innerHTML = "";
+  loadedMessageKeys.clear();
+
+
+  loadMessages();
+}
+
+
+window.switchChannel = switchChannel;
+
+
+function loadMessages() {
+  const messagesDiv = document.getElementById("messages");
+  messagesDiv.innerHTML = "";
+
+
+  messageRef = ref(db, "channels/" + currentChannel);
+
+
+  // Load last 50 messages
+  get(query(messageRef, limitToLast(50))).then(snapshot => {
+    snapshot.forEach(child => {
+      loadedMessageKeys.add(child.key);
+      displayMessage(child.val());
+    });
+  });
+
+
+  // Listen for new ones
+  onChildAdded(messageRef, snapshot => {
+    if (!loadedMessageKeys.has(snapshot.key)) {
+      loadedMessageKeys.add(snapshot.key);
+      displayMessage(snapshot.val());
+    }
+  });
+}
+
+
+function displayMessage(msg) {
+  const messagesDiv = document.getElementById("messages");
+
+
+  const div = document.createElement("div");
+  div.classList.add("message");
+  div.innerHTML = `<span class="username">${msg.username}:</span> ${msg.text}`;
+
+
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+
+loadMessages();
+
+
+document.getElementById("messageInput")
+  .addEventListener("keypress", function(e) {
+    if (e.key === "Enter") sendMessage();
+  });
+
+
+</script>
+
+
+</body>
+</html>
